@@ -95,6 +95,14 @@ void setup() {
     connect();
 }
 
+String getRandomCity(const String cities[], const int sizeOfArray) {
+    srand(time(NULL));  // Initialize random seed
+
+    int randomIndex = rand() % sizeOfArray;  // Generate a random index between 0 and n-1
+
+    return cities[randomIndex];
+}
+
 void loop() {
     mqttClient.loop();
     delay(10);  // <- fixes some issues with WiFi stability
@@ -237,12 +245,4 @@ void loop() {
     */
        delay(15000);
 
-}
-
-String getRandomCity(const String cities[], const int sizeOfArray) {
-    srand(time(NULL));  // Initialize random seed
-
-    int randomIndex = rand() % sizeOfArray;  // Generate a random index between 0 and n-1
-
-    return cities[randomIndex];
 }
