@@ -35,11 +35,6 @@ String yourPersonalTopic;
 const String cities[] = {"Kristiansand", "Oslo", "Alta", "Harstad", "Molde", "Bergen", "Mo i Rana"};
 const int amountOfCities = sizeof(cities) / sizeof(cities[0]);  // Number of elements in the array
 
-String location = getRandomCity(cities, amountOfCities);
-String endpoint = "http://api.openweathermap.org/data/2.5/weather?q=" + location + ",no&APPID=";
-const String key = "0fbfad07ebd8ba42e4384e55c8a77c58";
-const String units = "&units=metric";
-
 WiFiClient networkClient;
 MQTTClient mqttClient;
 
@@ -110,7 +105,7 @@ void loop() {
 
     // Weather API
     String location = getRandomCity(cities, amountOfCities);
-    const String endpoint = "http://api.openweathermap.org/data/2.5/weather?q=" + location + ",no&APPID=";
+    String endpoint = "http://api.openweathermap.org/data/2.5/weather?q=" + location + ",no&APPID=";
     const String key = "0fbfad07ebd8ba42e4384e55c8a77c58";
     const String units = "&units=metric";
 
