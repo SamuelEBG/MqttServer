@@ -46,75 +46,202 @@ MQTTClient mqttClient;
 unsigned long lastMillis = 0;
 
 void connect() {
-  Serial.print("checking wifi...");
-  while (WiFi.status() != WL_CONNECTED) {
-    Serial.print(".");
-    delay(1000);
-  }
+    Serial.print("checking wifi...");
+    while (WiFi.status() != WL_CONNECTED) {
+        Serial.print(".");
+        delay(1000);
+    }
 
-  String clientId = "ESP8266Client-"; // Create a random client ID
+    String clientId = "ESP8266Client-"; // Create a random client ID
     clientId += String(random(0xffff), HEX);
 
-  Serial.print("\nConnecting to Wifi...");
-  while (!mqttClient.connect(clientId.c_str(), mqtt_username, mqtt_password)) {
-    Serial.print(".");
-    delay(1000);
-  }
+    Serial.print("\nConnecting to Wifi...");
+    while (!mqttClient.connect(clientId.c_str(), mqtt_username, mqtt_password)) {
+        Serial.print(".");
+        delay(1000);
+    }
 
-  //yourPersonalTopic = "kristiania/pgr212/color";
-  yourPersonalTopic = "students/"; // Create a topic path based on your username
-  yourPersonalTopic += String(mqtt_username);
-  Serial.print("\nConnected to Wifi! Setting up Subscription to the topic: ");
-  Serial.println( yourPersonalTopic );
+    //yourPersonalTopic = "kristiania/pgr212/color";
+    yourPersonalTopic = "students/"; // Create a topic path based on your username
+    yourPersonalTopic += String(mqtt_username);
+    Serial.print("\nConnected to Wifi! Setting up Subscription to the topic: ");
+    Serial.println( yourPersonalTopic );
 
-  mqttClient.subscribe( yourPersonalTopic.c_str() );
+    mqttClient.subscribe( yourPersonalTopic.c_str() );
 }
 
 // Note: Do not publish, subscribe or unsubscribe in this method
 void messageReceived(String &topic, String &payload) {
-  Serial.println("incoming message: " + topic + " - " + payload);
+    Serial.println("incoming message: " + topic + " - " + payload);
 }
 
 void setup() {
-  strip.begin(); // Initialize pins for output
-  strip.setBrightness(30);
-  strip.show();  // Turn all LEDs off ASAP
+    strip.begin(); // Initialize pins for output
+    strip.setBrightness(30);
+    strip.show();  // Turn all LEDs off ASAP
 
-  USE_SERIAL.begin(115200);
+    USE_SERIAL.begin(115200);
 
-  USE_SERIAL.println();
-  USE_SERIAL.println();
-  USE_SERIAL.println();
+    USE_SERIAL.println();
+    USE_SERIAL.println();
+    USE_SERIAL.println();
 
-  for(uint8_t t = 4; t > 0; t--) {
-      USE_SERIAL.printf("[SETUP] WAIT %d...\n", t);
-      USE_SERIAL.flush();
-      delay(1000);
-  }
+    for(uint8_t t = 4; t > 0; t--) {
+        USE_SERIAL.printf("[SETUP] WAIT %d...\n", t);
+        USE_SERIAL.flush();
+        delay(1000);
+    }
 
-  WiFi.begin(ssid, pass);
+    WiFi.begin(ssid, pass);
 
-  mqttClient.begin(mqtt_server, networkClient);
-  mqttClient.onMessage(messageReceived);
+    mqttClient.begin(mqtt_server, networkClient);
+    mqttClient.onMessage(messageReceived);
 
-  connect();
+    connect();
 }
 
 void loop() {
-  mqttClient.loop();
-  delay(10);  // <- fixes some issues with WiFi stability
+    mqttClient.loop();
+    delay(10);  // <- fixes some issues with WiFi stability
 
-  if (!mqttClient.connected()) {
-    connect();
-  }
+    if (!mqttClient.connected()) {
+        connect();
+    }
 
-  // publish a message every 5 second.
-  /*
-  if (millis() - lastMillis > 5000) {
-    lastMillis = millis();
-    mqttClient.publish(yourPersonalTopic.c_str(), "hello");
-  }
-  */
+    // Weather API
+    String location = getRandomCity(cities, amountOfCities);
+    const String endpoint = "http://api.openweathermap.org/data/2.5/weather?q=" + location + ",no&APPID=";
+    const String key = "0fbfad07ebd8ba42e4384e55c8a77c58";
+    const String units = "&units=metric";
+
+    HTTPClient http;
+    HTTPClient httpPost;
+
+    http.useHTTP10(true);
+    httpPost.useHTTP10(true);
+
+    // configure traged server and url
+    http.begin(endpoint + key + units); //HTTP, GET weather from API
+    //httpPost.begin("http://dweet.io" + path);
+
+    // start connection and send HTTP header
+    int httpCode = http.GET();
+
+    // httpCode will be negative on error
+    if(httpCode > 0) {
+        // HTTP header has been send and Server response header has been handled
+        USE_SERIAL.println("");
+        USE_SERIAL.printf("[HTTP] GET... code: %d\n", httpCode);
+
+        // file found at server
+        if(httpCode == HTTP_CODE_OK) {
+            // String payload = http.getString();
+
+            DynamicJsonDocument doc(1024);
+            //StaticJsonDocument<200> doc;
+            // StaticJsonDocument<N> allocates memory on the stack, it can be
+            // replaced by DynamicJsonDocument which allocates in the heap.
+            //
+            // DynamicJsonDocument doc(200);
+
+            // Deserialize the JSON document using getStream instead of getString
+            DeserializationError error = deserializeJson(doc, http.getStream());
+
+            // Test if parsing succeeds.
+            if (error) {
+                Serial.print(F("deserializeJson() failed: "));
+                Serial.println(error.f_str());
+                return;
+            }
+
+            // Fetch values.
+            //
+            // Most of the time, you can rely on the implicit casts.
+            // In other case, you can do doc["time"].as<long>();
+            //const char* name = doc["name"];
+            float temp = doc["main"]["temp"];
+            float feelsLike = doc["main"]["feels_like"];
+            String weatherMain = doc["weather"][0]["main"];
+            String weatherDesc = doc["weather"][0]["description"];
+            String country = doc["sys"]["country"];
+            String city = doc["name"];
+            String location = city + ", " + country;
+
+            // Change led according to the weather
+            if (weatherMain.equalsIgnoreCase("clouds"))
+            {
+                strip.setPixelColor(0, 0,0,255);
+                strip.show(); // Update strip with new contents
+            }
+            
+            if (weatherMain.equalsIgnoreCase("sunny"))
+            {
+                strip.setPixelColor(0, 255,255,0);
+                strip.show(); 
+            }
+
+            if (weatherMain.equalsIgnoreCase("snow"))
+            {
+                strip.setPixelColor(0, 255,255,255);
+                strip.show();
+            }
+
+            if (weatherMain.equalsIgnoreCase("rain"))
+            {
+                strip.setPixelColor(0, 0, 255, 0);
+                strip.show();
+            }
+            
+            // Prepare payload to post to dweet
+            // "{\"api_key\":\"tPmAT5Ab3j7F9\",\"sensor\":\"BME280\",\"value1\":\"24.25\",\"value2\":\"49.54\",\"value3\":\"1005.14\"}"
+            /*
+            String postData = "{\"temperature\":\""; 
+            postData += weatherMain;
+            postData += "\",\"location\":\"";
+            postData += location;
+            postData += "\"}";
+            httpPost.addHeader("Content-Type", contentType);
+            
+           
+            // send the POST request
+            // read the status code and body of the response
+            int statusCode = httpPost.POST(postData);
+
+            Serial.print("Post status code: ");
+            Serial.println(statusCode);
+            */
+            
+            // Print values from GET to the terminal
+            /*
+            Serial.println(location);
+            Serial.println(weatherMain);
+            Serial.println(weatherDesc);
+            Serial.printf("Temperature: ");
+            Serial.println(temp);
+            Serial.printf("Feels like: ");
+            Serial.println(feelsLike);
+            */
+
+            if (millis() - lastMillis > 5000) {
+                lastMillis = millis();
+                mqttClient.publish(yourPersonalTopic.c_str(), weatherDesc);
+            }
+        }
+    } else {
+        USE_SERIAL.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
+    }
+    // httpPost.end();
+    http.end();
+
+    // publish a message every 5 second.
+    /*
+    if (millis() - lastMillis > 5000) {
+      lastMillis = millis();
+      mqttClient.publish(yourPersonalTopic.c_str(), "hello");
+    }
+    */
+       delay(15000);
+
 }
 
 String getRandomCity(const String cities[], const int sizeOfArray) {
