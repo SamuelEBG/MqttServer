@@ -212,7 +212,6 @@ void loop() {
           postData += "\"}";
           httpPost.addHeader("Content-Type", contentType);
           
-          
           // send the POST request
           // read the status code and body of the response
           int statusCode = httpPost.POST(postData);
